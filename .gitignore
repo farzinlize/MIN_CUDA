@@ -1,1 +1,6 @@
 *.vcxproj
+/.vscode
+/x64
+*.exe
+*.lib
+*.exp
