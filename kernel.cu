@@ -2,6 +2,7 @@
 #include "device_launch_parameters.h"
 extern "C" {
 	#include "helper_functions.h"
+	#include "fuzzy_timing.h"
 }
 #include <stdio.h>
 #include <cuda.h>
@@ -19,9 +20,9 @@ __device__	int device_min(int a, int b) {
 __global__ void minKernel(int *a_in, int *out){
 	extern __shared__ int a_s[];
 	unsigned int tid_block = threadIdx.x;
-	unsigned int tid = blockDim.x * blockIdx.x + tid_block;
+	unsigned int tid = (blockDim.x*2) * blockIdx.x + tid_block;
 	
-	a_s[tid_block] = a_in[tid];
+	a_s[tid_block] = device_min(a_in[tid], a_in[tid+blockDim.x]);
 	__syncthreads();
 
 	for (unsigned int s = blockDim.x/2; s > 0 ; s >>= 1) {
@@ -45,37 +46,40 @@ int find_min_seq(int *a, int size) {
 
 int main(){
 
+	int stream_count = 4;
+
 	int size = 1024 * 1024, block_size = 1024;
 	int *a_h, *a_d, *out_d, *device_out_h;
+	int min_parralel, min_seq;
 	double seq_time, mem_time, total_time, kernel_time;
 
-	initialize_data_random(&a_h, size);
-	initialize_data_zero(&device_out_h, block_size);
+	initialize_data_random_cudaMallocHost(&a_h, size);	//initial data on host
+	initialize_data_zero_cudaMallocHost(&device_out_h, block_size);
 	
-	#ifdef DEBUG
-	printf("device_out_h array: \n");
-	for(int k=0;k<block_size;k++){printf("%d\t", device_out_h[k]);}
-	#endif
+	cudaStream_t* streams = (cudaStream_t *)malloc(sizeof(cudaStream_t) * stream_count);
+	for(int i=0;i<stream_count;i++){
+		cudaStreamCreate(&streams[i]);
+	}
 
-	set_clock();
+	set_clock();	//sequentinal run
 
-	int min_seq = find_min_seq(a_h, size);
+	min_seq = find_min_seq(a_h, size);
 
-	seq_time = get_time();
+	seq_time = get_elapsed_time();
 
 	printf("[TIME] Sequential: %.4f\n", seq_time);
 
-	dim3 grid_dim(1024, 1, 1);
+	dim3 grid_dim(512, 1, 1);
 	dim3 block_dim(block_size, 1, 1);
 	
-	set_clock();
+	set_clock();	//parallel run
 
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&a_d, sizeof(int)*size));
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_d, sizeof(int)*block_size));
 
 	CUDA_CHECK_RETURN(cudaMemcpy(a_d, a_h, sizeof(int)*size, cudaMemcpyHostToDevice));
 
-	mem_time = get_time();
+	mem_time = get_elapsed_time();
 	set_clock();
 
 	minKernel <<<grid_dim, block_dim, sizeof(int)*block_size, NULL >>> (a_d, out_d);
@@ -83,19 +87,19 @@ int main(){
 	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 	CUDA_CHECK_RETURN(cudaGetLastError());
 
-	kernel_time = get_time();
+	kernel_time = get_elapsed_time();
 	set_clock();
 
 	CUDA_CHECK_RETURN(cudaMemcpy(device_out_h, out_d, sizeof(int)*block_size, cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 	CUDA_CHECK_RETURN(cudaGetLastError());
 
-	mem_time += get_time();
+	mem_time += get_elapsed_time();
 	set_clock();
 
-	int min_parralel = find_min_seq(device_out_h, block_size);
+	min_parralel = find_min_seq(device_out_h, block_size);
 
-	total_time = get_time();
+	total_time = get_elapsed_time();
 	total_time += kernel_time + mem_time;
 
 	printf("[TIME] total parallel: %.4f\n", total_time);

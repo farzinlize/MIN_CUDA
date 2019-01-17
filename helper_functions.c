@@ -1,7 +1,5 @@
 #include"helper_functions.h"
 
-clock_t begin;
-
 void validate(int *a, int *b, int length) {
 	for (int i = 0; i < length; ++i) {
 		if (a[i] != b[i]) {
@@ -20,7 +18,7 @@ void initialize_data_random(int **data, int data_size) {
 
 	*data = (int *)malloc(sizeof(int) * data_size);
 	for (int i = 0; i < data_size; i++) {
-		(*data)[i] = rand() % RANGE;
+		(*data)[i] = rand() % RANDOM_NUMBER_MAX;
 	}
 }
 
@@ -29,11 +27,18 @@ void initialize_data_zero(int **data, int data_size) {
 	memset(*data, 0, data_size * sizeof(int));
 }
 
-void set_clock(){
-	begin = clock();
+void initialize_data_random_cudaMallocHost(int **data, int data_size){
+
+	static time_t t;
+	srand((unsigned) time(&t));
+
+	cudaMallocHost((void **)data, sizeof(int) * data_size);
+	for(int i = 0; i < data_size; i++){
+		(*data)[i] = rand() % RANDOM_NUMBER_MAX;
+	}   
 }
 
-double get_time(){
-	clock_t end = clock();
-	return ((double)(end - begin) / CLOCKS_PER_SEC)*100;
+void initialize_data_zero_cudaMallocHost(int **data, int data_size){
+	cudaMallocHost((void **)data, sizeof(int) * data_size);
+	memset(*data, 0, data_size*sizeof(int));
 }
