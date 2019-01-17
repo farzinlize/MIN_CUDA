@@ -47,7 +47,7 @@ int main(){
 
 	int size = 1024 * 1024, block_size = 1024;
 	int *a_h, *a_d, *out_d, *device_out_h;
-	double elapced;
+	double seq_time, mem_time, total_time, kernel_time;
 
 	initialize_data_random(&a_h, size);
 	initialize_data_zero(&device_out_h, block_size);
@@ -61,37 +61,46 @@ int main(){
 
 	int min_seq = find_min_seq(a_h, size);
 
-	elapced = get_time();
+	seq_time = get_time();
 
-	printf("TIME Seq: %f\n", elapced);
+	printf("[TIME] Sequential: %.4f\n", seq_time);
 
+	dim3 grid_dim(1024, 1, 1);
+	dim3 block_dim(block_size, 1, 1);
+	
 	set_clock();
 
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&a_d, sizeof(int)*size));
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_d, sizeof(int)*block_size));
 
-	dim3 grid_dim(1024, 1, 1);
-	dim3 block_dim(block_size, 1, 1);
-
 	CUDA_CHECK_RETURN(cudaMemcpy(a_d, a_h, sizeof(int)*size, cudaMemcpyHostToDevice));
 
-	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
-	CUDA_CHECK_RETURN(cudaGetLastError());
+	mem_time = get_time();
+	set_clock();
 
 	minKernel <<<grid_dim, block_dim, sizeof(int)*block_size, NULL >>> (a_d, out_d);
 	
 	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 	CUDA_CHECK_RETURN(cudaGetLastError());
 
+	kernel_time = get_time();
+	set_clock();
+
 	CUDA_CHECK_RETURN(cudaMemcpy(device_out_h, out_d, sizeof(int)*block_size, cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 	CUDA_CHECK_RETURN(cudaGetLastError());
 
+	mem_time += get_time();
+	set_clock();
+
 	int min_parralel = find_min_seq(device_out_h, block_size);
 
-	elapced = get_time();
+	total_time = get_time();
+	total_time += kernel_time + mem_time;
 
-	printf("TIME parallel: %f\n", elapced);
+	printf("[TIME] total parallel: %.4f\n", total_time);
+	printf("[TIME] mem_time: %.4f\n", mem_time);
+	printf("[TIME] kernel_time : %.4f\n", kernel_time);
 
 	#ifdef DEBUG
 	printf("device_out_h array: \n");
@@ -100,7 +109,7 @@ int main(){
 	}
 	#endif
 
-	printf("Parallel_min: %d \nSeq_min: %d", min_parralel, min_seq);
+	printf("Parallel_min: %d \tSeq_min: %d", min_parralel, min_seq);
 
     return 0;
 }
