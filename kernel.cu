@@ -29,7 +29,7 @@ __global__ void minKernel(int *a_in, int *out){
 			a_s[tid_block] = device_min(a_s[tid_block], a_s[tid_block + s]);
 		__syncthreads();
 	}
-	//printf("%d %d\n" , tid , out[tid]);
+
 	if (tid_block == 0)
 		out[blockIdx.x] = a_s[0];
 }
@@ -47,6 +47,7 @@ int main(){
 
 	int size = 1024 * 1024, block_size = 1024;
 	int *a_h, *a_d, *out_d, *device_out_h;
+	double elapced;
 
 	initialize_data_random(&a_h, size);
 	initialize_data_zero(&device_out_h, block_size);
@@ -56,7 +57,15 @@ int main(){
 	for(int k=0;k<block_size;k++){printf("%d\t", device_out_h[k]);}
 	#endif
 
+	set_clock();
+
 	int min_seq = find_min_seq(a_h, size);
+
+	elapced = get_time();
+
+	printf("TIME Seq: %f\n", elapced);
+
+	set_clock();
 
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&a_d, sizeof(int)*size));
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_d, sizeof(int)*block_size));
@@ -78,14 +87,18 @@ int main(){
 	CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 	CUDA_CHECK_RETURN(cudaGetLastError());
 
+	int min_parralel = find_min_seq(device_out_h, block_size);
+
+	elapced = get_time();
+
+	printf("TIME parallel: %f\n", elapced);
+
 	#ifdef DEBUG
 	printf("device_out_h array: \n");
 	for(int k=0; k < block_size ;k++){
 		printf("%d\t", device_out_h[k]);
 	}
 	#endif
-
-	int min_parralel = find_min_seq(device_out_h, block_size);
 
 	printf("Parallel_min: %d \nSeq_min: %d", min_parralel, min_seq);
 

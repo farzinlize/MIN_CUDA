@@ -4,6 +4,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<time.h>
 
 #define RANGE 1000
 
@@ -20,5 +21,9 @@ void validate(int *a, int *b, int length);
 void initialize_data_random(int **data, int data_size);
 
 void initialize_data_zero(int **data, int data_size);
+
+void set_clock();
+
+double get_time();
 
 #endif

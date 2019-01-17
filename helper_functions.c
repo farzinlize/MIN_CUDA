@@ -1,5 +1,7 @@
 #include"helper_functions.h"
 
+clock_t begin;
+
 void validate(int *a, int *b, int length) {
 	for (int i = 0; i < length; ++i) {
 		if (a[i] != b[i]) {
@@ -25,4 +27,13 @@ void initialize_data_random(int **data, int data_size) {
 void initialize_data_zero(int **data, int data_size) {
 	*data = (int *)malloc(sizeof(int) * data_size);
 	memset(*data, 0, data_size * sizeof(int));
+}
+
+void set_clock(){
+	begin = clock();
+}
+
+double get_time(){
+	clock_t end = clock();
+	return ((double)(end - begin) / CLOCKS_PER_SEC)*100;
 }
