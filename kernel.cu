@@ -60,8 +60,14 @@ int main(int argc, char * argv[]){
 	int min_parralel, min_seq;
 	double seq_time, total_time, kernel_time;
 
+	int stream_size = size / stream_count;
+	int block_count = (stream_size/block_size)/2;
+	int out_size_stream = block_count / stream_count;
+	dim3 grid_dim(block_count, 1, 1);
+	dim3 block_dim(block_size, 1, 1);
+
 	initialize_data_random_cudaMallocHost(&a_h, size);	//initial data on host
-	initialize_data_zero_cudaMallocHost(&device_out_h, block_size);
+	initialize_data_zero_cudaMallocHost(&device_out_h, block_count);
 	
 	cudaStream_t* streams = (cudaStream_t *)malloc(sizeof(cudaStream_t) * stream_count);
 	for(int i=0;i<stream_count;i++){
@@ -75,17 +81,11 @@ int main(int argc, char * argv[]){
 	seq_time = get_elapsed_time();
 
 	printf("[TIME] Sequential: %.4f\n", seq_time);
-
-	int stream_size = size / stream_count;
-	int out_size_stream = block_size / stream_count;
-	int block_count = (stream_size/block_size)/2;
-	dim3 grid_dim(block_count, 1, 1);
-	dim3 block_dim(block_size, 1, 1);
 	
 	set_clock();	//parallel run
 
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&a_d, sizeof(int)*size));
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_d, sizeof(int)*block_size));
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_d, sizeof(int)*block_count));
 
 	int offset = 0, out_offset = 0;
 	for(int stream_id=0 ; stream_id < stream_count ; stream_id++){
@@ -102,7 +102,7 @@ int main(int argc, char * argv[]){
 	kernel_time = get_elapsed_time();
 	set_clock();
 
-	min_parralel = find_min_seq(device_out_h, block_size);
+	min_parralel = find_min_seq(device_out_h, block_count);
 
 	total_time = get_elapsed_time();
 	total_time += kernel_time;
@@ -112,7 +112,7 @@ int main(int argc, char * argv[]){
 
 	#ifdef DEBUG
 	printf("device_out_h array: \n");
-	for(int k=0; k < block_size ;k++){
+	for(int k=0; k < block_count ;k++){
 		printf("%d\t", device_out_h[k]);
 	}
 	#endif
